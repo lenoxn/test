@@ -1,0 +1,88 @@
+#!/usr/bin/python
+
+import base64, smtplib, os, datetime, shutil, zipfile, tempfile
+from email import Encoders
+from email.MIMEBase import MIMEBase
+from email.MIMEText import MIMEText
+from email.MIMEMultipart import MIMEMultipart
+from datetime import date
+from datetime import timedelta
+
+def send_mail(d, m, y, cName, toPerson, fromName, distList):
+
+    folder = 'C:\\FTP\\weeklies\\'
+    current_zipfile = cName + '.zip'
+    COMMASPACE = ', '
+    fileCount = 0
+
+    zf = tempfile.TemporaryFile(prefix='mail', suffix='.zip') 
+    zip = zipfile.ZipFile(zf, 'w')
+
+    for folderName, subfolders, filenames in os.walk(folder):
+	for filename in filenames: 
+		if distList == 'std':  
+			if filename.startswith(cName) and 'Email' not in filename and filename.endswith('.xls'):
+				zip.write(os.path.join(folderName, filename), arcname=filename, compress_type=zipfile.ZIP_DEFLATED)
+				fileCount += 1
+
+    zip.close()
+    zf.seek(0)
+
+    for folderName, subfolders, filenames in os.walk(folder):
+        for filename in filenames:
+		if distList == 'dmagrants':
+                	if filename.startswith('DMA-') and 'Email' not in filename and filename.endswith('.htm'):
+                        	with open (os.path.join(folderName, filename),"r") as myfile:
+                                	html=myfile.read()
+
+		else:
+                	if filename.startswith(cName) and 'Email' not in filename and filename.endswith('.htm'):
+                        	with open (os.path.join(folderName, filename),"r") as myfile:
+                                	html=myfile.read()
+
+    toaddr = ['x.com']
+#    toaddr = toPerson
+    fromaddr = 'x.com'
+
+    if fileCount == 1:
+    	subject = cName + ' Weekly Report for week of %s-%s-%s' % (m,d,y)
+	replacements = {'<body>':'<body><p>Hello all,<br><br>Please find attached your weekly PPC report. If you have any questions please let us know.<br><br>Thanks,<br><br>$$name </p>','$$name':fromName}
+
+        for i,j in replacements.iteritems():
+        	html=html.replace(i,j)
+    else:
+    	subject = cName + ' Weekly Reports for week of %s-%s-%s' % (m,d,y)
+        replacements = {'<body>':'<body><p>Hello all,<br><br>Please find attached your weekly PPC reports. If you have any questions please let us know.<br><br>Thanks,<br><br>$$name </p>','$$name':fromName}
+
+        for i,j in replacements.iteritems():
+        	html=html.replace(i,j)
+    
+    msg = MIMEMultipart()
+    msg['Subject'] = subject
+    msg['From'] = fromaddr
+    msg['To'] = COMMASPACE.join(toaddr)
+    
+    msg.attach(MIMEText(html, 'html'))
+
+    part = MIMEBase('application', 'zip')
+    part.set_payload(zf.read())
+    Encoders.encode_base64(part)
+    part.add_header('Content-Disposition', 'attachment', filename= current_zipfile )
+
+    msg.attach(part)
+
+    host = 'x.com'
+    port = 465
+    server = smtplib.SMTP_SSL(host, port)
+    server.set_debuglevel(1)
+
+    server.login(fromaddr, base64.b64decode('QWR3cmVwMHJ0cyE='))
+    server.sendmail(fromaddr, toaddr, msg.as_string())
+    server.quit()
+
+if __name__ == '__main__':
+    today = date.today()
+    sdate = today - timedelta(days= (today.weekday() -5) %7) 
+
+    send_mail(sdate.day,sdate.month,sdate.year,'client_name',['x@x.com'],'manager','std')
+    
